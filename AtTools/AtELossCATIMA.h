@@ -20,7 +20,8 @@ protected:
    double fProjectileMassAmu{-1}; /// Mass of the projectile in amu (atomic mass units).
 
    double fRangeStepSize{0.1}; // mm
-   catima::Config fConfig{catima::default_config};
+   //catima::Config fConfig{catima::default_config};
+   catima::Config fConfig{};
 
 public:
    /**
