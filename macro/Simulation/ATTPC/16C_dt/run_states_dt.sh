@@ -23,9 +23,9 @@
 #
 #   ./run_states_dt.sh [nEvents] [seed] [outDir]
 set -eo pipefail
-NEV=${1:-20000}
+NEV=${1:-10000}
 SEED=${2:-3001}
-OUT=${3:-/mnt/f/a1975_C16_dt_sim}
+OUT=${3:-$HOME/fair_install/ATTPCROOTv2-OpenKF/macro/Simulation/ATTPC/16C_dt/data}
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO=$(cd "$HERE/../../../.." && pwd)
 set +u; source "$REPO/build/config.sh" >/dev/null 2>&1; set -u

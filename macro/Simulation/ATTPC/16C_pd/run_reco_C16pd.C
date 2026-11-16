@@ -34,7 +34,7 @@
 
 void run_reco_C16pd(TString mcFile = "./data/attpcsim.root", TString outputFile = "./data/sim_reco.root",
                   TString paramFile = "ATTPC.a1975_C16_sim.par", Double_t thr = 20, Int_t hdMcs = 20, Int_t hdMs = 8,
-                  Int_t nEvents = 0, Double_t holeR = 20.0, TString joinMethod = "mover")
+                  Int_t nEvents = 0, Double_t holeR = 20.0, TString joinMethod = "mover", Int_t evStart = 0)
 {
    TString scriptfile = "Lookup20150611.xml";
    TString dir = getenv("VMCWORKDIR");
@@ -123,7 +123,7 @@ void run_reco_C16pd(TString mcFile = "./data/attpcsim.root", TString outputFile 
    fRun->Init();
    timer.Start();
    if (nEvents > 0)
-      fRun->Run(0, nEvents);
+      fRun->Run(evStart, evStart + nEvents);
    else
       fRun->Run();
    timer.Stop();

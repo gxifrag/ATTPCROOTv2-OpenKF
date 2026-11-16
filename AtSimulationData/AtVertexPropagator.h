@@ -84,8 +84,10 @@ public:
    void Setd2HeVtx(TVector3 val);
    void Setd2HeVtx(Double_t x0, Double_t y0, Double_t theta, Double_t phi);
    void SetIsBeamEvent(bool val) { kIsBeamEvent = val; };
+  
    bool IsBeamEvent() { return kIsBeamEvent; };
    bool IsReactionEvent() { return !kIsBeamEvent; };
+  
 
    Double_t GetBeamMass();
    Double_t GetVx();

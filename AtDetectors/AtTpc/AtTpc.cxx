@@ -215,6 +215,9 @@ bool AtTpc::reactionOccursHere()
    // see the long comment there. Do NOT guard this with AtVertexPropagator::IsBeamEvent(): that
    // flag is flipped by AtReactionGenerator::ReadEvent during GENERATION, so by stepping time its
    // sense is inverted and the guard disables the real trigger instead of the spurious one.
+
+   //Above comment is already implemented.
+
    bool atEnergyLoss = fELossAcc * 1000 > AtVertexPropagator::Instance()->GetRndELoss();
    bool isPrimaryBeam = fTrackID == 0;
    bool isInRightVolume = fVolName.Contains("drift_volume") || fVolName.Contains("cell");

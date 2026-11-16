@@ -1,6 +1,11 @@
+#include <TFile.h>
+#include <TParameter.h>
+
+
 /// @file C16_pd_sim.C
 /// @brief a1975 16C(p,d)15C simulation, matched to the experimental running conditions.
 ///
+
 /// Purpose: the acceptance of the deuteron channel, measured per FINAL STATE. The (p,d)
 /// analysis extracts four states of 15C -- the ground state, 0.740, 3.10 and 4.66 MeV -- and a
 /// transfer reaction changes its two-body kinematics with every one of them, so theta_lab
@@ -9,7 +14,8 @@
 ///
 /// CONDITIONS (a1975, proton-target runs):
 ///     B = 2.85 T,  H2 at 300 torr,  drift length 1000 mm
-///     beam 16C at 192 MeV = 12.0 MeV/u
+///     NOT: beam 16C at 192 MeV = 12.0 MeV/u
+///     beam 16C at 184 MeV = 11.5 MeV/u (energy at the chamber ENTRANCE, after the IC)
 ///
 /// !! THE GAS IS 300 torr, AND THE PRODUCTION RECONSTRUCTION DISAGREES !!
 /// rho = 3.308e-5 g/cm3 (H2, 300 torr, 293 K), geometry ATTPC_H300torr_RT.root. But the a1975
@@ -21,14 +27,18 @@
 /// The 9.0e-5 figure is doubly wrong: even at 1 bar it is the 273 K density, where 293 K gives
 /// 8.27e-5. Use the _RT media entries, which carry the room-temperature values.
 ///
-/// BEAM ENERGY. 192 MeV is what the (p,d) analysis macros use. The (p,p') calibration of the
+/// NOT: BEAM ENERGY. 192 MeV is what the (p,d) analysis macros use. The (p,p') calibration of the
 /// same data set prefers 195.5 MeV; the difference moves pz by 0.9 percent and is left as a
 /// parameter rather than silently chosen here.
 ///
+/// BEAM ENERGY. 184 MeV is the physical energy at the gas entrance (12 MeV/u at the IC
+/// minus IC + windows). The analysis uses an EFFECTIVE 185 MeV tuned on the spectrum plus
+/// an empirical angle correction; that is a reconstruction parameter, not a physical energy.
 /// Beam momentum: the ion generator multiplies pz by A, so pz is GeV/c per nucleon.
+
 ///     m(16C) = 16.0147 u = 14917.60 MeV
-///     KE = 192.0 MeV  ->  p = 2401.088 MeV/c  ->  pz = 2.401088/16 per nucleon
-///
+///    NOT:  KE = 192.0 MeV  ->  p = 2401.088 MeV/c  ->  pz = 2.401088/16 per nucleon
+///     KE = 184.0 MeV  ->  p = 2350.22 MeV/c  ->  pz = 2.35022/16 per nucleon
 ///   root -l 'C16_pd_sim.C(2000)'                      // ground state
 ///   root -l 'C16_pd_sim.C(8000,2.,178.,"TGeant4",-28.5,"./data/pd_ex1.root",0.740,1001)'
 ///
@@ -40,9 +50,9 @@
 /// CM ANGULAR RANGE: the default is the full 2-178 deg, because an acceptance measurement has to
 /// measure where the detector stops accepting. Truncating the generated range to the region that
 /// is known to work builds the answer into the input.
-void C16_pd_sim(Int_t nEvents = 2000, Double_t thetaMinCM = 2.0, Double_t thetaMaxCM = 178.0,
+void C16_pd_sim(Int_t nEvents = 20000, Double_t thetaMinCM = 2.0, Double_t thetaMaxCM = 178.0,
                 TString mcEngine = "TGeant4", Double_t bFieldkG = -28.5, TString outFile = "./data/attpcsim.root",
-                Double_t resEx = 0.0, UInt_t seed = 0, Double_t Ebeam = 192.0)
+                Double_t resEx = 0.0, UInt_t seed = 0, Double_t Ebeam = 184.0) //192.0
 {
    // Parallel jobs with no seed produce byte-identical events, so "more statistics" would be the
    // same sample copied. seed = 0 keeps ROOT's time-based default; pass a distinct value per job.
@@ -108,11 +118,11 @@ void C16_pd_sim(Int_t nEvents = 2000, Double_t thetaMinCM = 2.0, Double_t thetaM
    // 1 bar. Scaling by the density ratio 3.308/8.27 gives about 10 MeV at 300 torr. Re-verify the
    // same way after any change: the vertex must stay flat across the drift length, and the solved
    // beam energy should fall linearly from the entrance value.
-   Double_t maxELoss = 10.0; // MeV
+   Double_t maxELoss = 11.; // MeV 10.49
 
    AtTPCIonGenerator *ionGen =
       new AtTPCIonGenerator("Ion", z, a, q, m, px, py, pz, BExcEner, Bmass, NomEnergy, maxELoss);
-   ionGen->SetSpotRadius(0, -100, 0);
+   ionGen->SetSpotRadius(0, -100, 0); //(r, z, offx) so -100 is initial z, and it is a point-like beam (r=0)
    primGen->AddGenerator(ionGen);
 
    // -----   Two-body reaction 16C(p,d)15C   --------------------------------
@@ -176,7 +186,7 @@ void C16_pd_sim(Int_t nEvents = 2000, Double_t thetaMinCM = 2.0, Double_t thetaM
 
    AtTPC2Body *TwoBody = new AtTPC2Body("TwoBody", &Zp, &Ap, &Qp, mult, &Pxp, &Pyp, &Pzp, &Mass, &ExE, ResEner,
                                         ThetaMinCMS, ThetaMaxCMS);
-   primGen->AddGenerator(TwoBody);
+   primGen->AddGenerator(TwoBody); //unreacted tracks, punch-through, are 'empty entries' in the exit channel (odd entries)
 
    run->SetGenerator(primGen);
    run->SetStoreTraj(kTRUE);
@@ -191,6 +201,27 @@ void C16_pd_sim(Int_t nEvents = 2000, Double_t thetaMinCM = 2.0, Double_t thetaM
    rtdb->print();
 
    run->Run(nEvents);
+   
+   // Stamp the simulated state into the output file, so the file says by itself what it contains.
+   {
+      TFile f(outFile, "UPDATE");
+      if (f.IsZombie()) {
+         std::cout << "WARNING: could not reopen " << outFile << " to store resEx" << std::endl;
+      } else {
+         TParameter<Double_t> pEx("resEx", resEx);
+         TParameter<Double_t> pEb("Ebeam", Ebeam);
+         TParameter<Double_t> pTmin("thetaMinCM", thetaMinCM);
+         TParameter<Double_t> pTmax("thetaMaxCM", thetaMaxCM);
+         TParameter<Int_t> pSeed("seed", (Int_t)seed);
+         pEx.Write();
+         pEb.Write();
+         pTmin.Write();
+         pTmax.Write();
+         pSeed.Write();
+         f.Close();
+      }
+   }
+
    run->CreateGeometryFile("./data/geofile_C16_pd_full.root");
 
    timer.Stop();

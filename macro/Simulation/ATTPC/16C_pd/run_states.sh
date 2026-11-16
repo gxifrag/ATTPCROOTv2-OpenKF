@@ -15,9 +15,12 @@
 #
 #   ./run_states.sh [nEvents] [seed] [outDir]
 set -eo pipefail
-NEV=${1:-8000}
+#NEV=${1:-100}
+NEV=${1:-500000}
 SEED=${2:-1001}
-OUT=${3:-/mnt/f/a1975_C16_pd_sim}
+#OUT=${3:-/mnt/f/a1975_C16_pd_sim}
+OUT=${3:-$HOME/fair_install/ATTPCROOTv2-OpenKF/macro/Simulation/ATTPC/16C_pd/data}
+
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO=$(cd "$HERE/../../../.." && pwd)
 set +u; source "$REPO/build/config.sh" >/dev/null 2>&1; set -u
@@ -26,14 +29,17 @@ mkdir -p "$OUT"
 cd "$HERE"
 
 # tag:excitation
-for CFG in "gs:0.0" "ex1:0.740" "ex2:3.100" "ex3:4.660"; do
+#for CFG in "gs:0.0" "ex1:0.740" "ex2:3.103" "ex3:4.657"; do
+for CFG in "ex3:4.657"; do
   TAG=${CFG%%:*}; EX=${CFG##*:}
   J="${TAG}_s${SEED}"
-  if [ -f "$OUT/$J.marker" ]; then
+  if [ -f "$OUT/$J.marker" ]; then 
     echo "[$(date +%H:%M:%S)] $J already COMPLETED"
     continue
   fi
   echo "[$(date +%H:%M:%S)] $J: 15C at Ex = $EX MeV, $NEV events"
+
+  
   root -b -q -l "C16_pd_sim.C($NEV,2.,178.,\"TGeant4\",-28.5,\"$OUT/${J}_sim.root\",$EX,$SEED)" \
        > "$OUT/${J}_gen.log" 2>&1
   # "the file exists" is not the same as "the job finished"; require both the seed to have been
@@ -41,7 +47,13 @@ for CFG in "gs:0.0" "ex1:0.740" "ex2:3.100" "ex3:4.660"; do
   [ -s "$OUT/${J}_sim.root" ] || { echo "  $J GEN_FAILED -- see $OUT/${J}_gen.log"; continue; }
   grep -q "RNG seed requested: $SEED" "$OUT/${J}_gen.log" || { echo "  $J SEED_NOT_APPLIED"; continue; }
   grep -q "Macro finished successfully" "$OUT/${J}_gen.log" || { echo "  $J DID_NOT_FINISH"; continue; }
+
+  root -b -q -l -e "auto f=TFile::Open(\"$OUT/${J}_sim.root\"); auto p=(TParameter<Double_t>*)f->Get(\"resEx\"); if(!p || fabs(p->GetVal()-$EX)>1e-6) gSystem->Exit(1);" \
+    >/dev/null 2>&1 || { echo "  $J RESEX_NOT_STORED"; continue; }
+
   echo COMPLETED > "$OUT/$J.marker"
   echo "  $J done ($(du -h "$OUT/${J}_sim.root" | cut -f1))"
 done
 echo "[$(date +%H:%M:%S)] all four states generated in $OUT"
+
+#watch -n 30 "tail -c 2000000 $HOME/fair_install/ATTPCROOTv2-OpenKF/macro/Simulation/ATTPC/16C_pd/data/gs_s1001_gen.log | grep -a -o '>>> Event [0-9]*' | tail -1"

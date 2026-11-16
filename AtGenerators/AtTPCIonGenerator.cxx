@@ -155,6 +155,7 @@ Bool_t AtTPCIonGenerator::ReadEvent(FairPrimaryGenerator *primGen)
    SetVertexCoordinates();
 
    if (AtVertexPropagator::Instance()->IsBeamEvent()) {
+      
       if (fDoReact) {
          Double_t Er = gRandom->Uniform(0., fMaxEnLoss);
          AtVertexPropagator::Instance()->SetRndELoss(Er);

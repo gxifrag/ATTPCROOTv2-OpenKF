@@ -42,7 +42,7 @@
 
 #include "../AtBeamHole.h"
 
-void run_reco_C16dt(TString mcFile = "./data/dt_test.root", TString outputFile = "./data/dt_sim_reco.root",
+void run_reco_C16dt(TString mcFile = "./data/dt_test.root", TString outputFile = "/media/georgina/Aurio/Georgina/reco16Cdt/dt_sim_reco.root",
                     TString paramFile = "ATTPC.a1975_deuterium_dv1104.par", Double_t thr = 20, Int_t hdMcs = 20,
                     Int_t hdMs = 8, Int_t nEvents = 0, Double_t holeR = 20.0, TString joinMethod = "mover",
                     Double_t adcCeiling = 0)
