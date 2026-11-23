@@ -29,6 +29,7 @@ void plot_states_C16pd(TString dir = "./data", Double_t Ebeam = 184.0,
                        TString tag = "184")
 {
    gSystem->Load("libAtSimulationData.so");
+   gSystem->Load("libAtData.so");
    gStyle->SetOptStat(0);
    TString here = gSystem->DirName(gInterpreter->GetCurrentMacroName());
    std::cout << "here directory: " << here << " " << std::endl;
@@ -62,7 +63,7 @@ void plot_states_C16pd(TString dir = "./data", Double_t Ebeam = 184.0,
    std::vector<double> gsKE, gsTh, gsZ; // g.s. events kept for the dEdrift scan
    std::vector<double> sKE[NS], sTh[NS], sZ[NS];   // todos los estados, para el segundo canvas
    
-   printf("\n  Ebeam = %.2f MeV, dEdrift = %.2f MeV/940 mm\n", Ebeam, dEdrift);
+   printf("\n  Ebeam = %.2f MeV, dEdrift = %.2f MeV/ %.2f mm\n", Ebeam, dEdrift, Lgas);
    printf("  state   generated   reconstructed at Ebeam     corrected with vertex z      events\n");
    for (int i = 0; i < NS; ++i) {
       TChain *t = new TChain("cbmsim");

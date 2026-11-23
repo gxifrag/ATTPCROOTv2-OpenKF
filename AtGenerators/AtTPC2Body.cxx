@@ -498,7 +498,15 @@ Bool_t AtTPC2Body::GenerateReaction(FairPrimaryGenerator *primGen)
                       << " (PDG code " << pdgType << ")" << std::endl;
             std::cout << "    Momentum (" << fPx.at(i) << ", " << fPy.at(i) << ", " << fPz.at(i)
                       << ") Gev from vertex (" << fVx << ", " << fVy << ", " << fVz << ") cm" << std::endl;
-            primGen->AddTrack(pdgType, fPx.at(i), fPy.at(i), fPz.at(i), fVx, fVy, fVz);
+            // Pass the TOTAL ENERGY computed with this generator's own mass (fWm, MeV, including Ex).
+            // Without it, FairPrimaryGenerator recomputes E from TDatabasePDG, whose light-ion masses
+            // come from geant4_vmc (deuteron 1871.06 MeV, 4.55 MeV too low) and which has no Ex for
+            // excited states; Geant4 then starts (and tracks) the product with that mass and a shifted
+            // kinetic energy. Added 2026-11-18, see the simulation log, section "Masses".
+            const Double_t mGeV = fWm.at(i) / 1000.;
+            const Double_t eTot = std::sqrt(fPx.at(i) * fPx.at(i) + fPy.at(i) * fPy.at(i) +
+                                            fPz.at(i) * fPz.at(i) + mGeV * mGeV);
+            primGen->AddTrack(pdgType, fPx.at(i), fPy.at(i), fPz.at(i), fVx, fVy, fVz, -1, true, eTot);
 
          } else if (i > 1 && pdgType == 2212 && fPType.at(i) == "Proton") {
 

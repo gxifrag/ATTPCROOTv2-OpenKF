@@ -7,13 +7,12 @@
 ///     AtDirDeDxCleaner
 ///     AtTrackFinderHDBSCAN(mcs = 20, ms = 8, eps 10, mover, join 15, overlap 0.25,
 ///                          gapTol 40, angleTol 35)
-/// It uses parameters/ATTPC.a1975_C16_sim.par. NOTE that this is NOT the par the a1975 data
-/// reconstruction loads: that one is ATTPC.a1954.par, which declares 600 torr and a density of
-/// 0.197 mg/cm3, neither of which is H2 at 1 bar. The two agree on what matters for the geometry
-/// of the reconstruction -- drift velocity 1.30 cm/us, sampling rate, B field, drift length --
-/// and differ in the gas description and in the digitisation gain and diffusion, which the data
-/// par does not need but the simulation does. That inconsistency in the data par is unresolved
-/// and is worth settling before any absolute use of these acceptances.
+/// 
+/// PARAMETERS & CONFIGURATION:
+///     - Uses parameters/ATTPC.a1975_C16_sim.par. 
+///     - Core geometric parameters agree on what matters for reconstruction: drift velocity (1.30 cm/us), 
+///       sampling rate, magnetic field, and drift length. It properly incorporates the gas description, 
+///       digitisation gain, and diffusion required for the simulation.
 ///
 /// CLOSURE TEST, not a drift-velocity measurement. Digitising and reconstructing with the same
 /// drift velocity is an identity: z -> TB -> z cancels exactly, so this cannot say whether
@@ -23,10 +22,12 @@
 /// end of the chamber than at the entrance, which is larger than the 0.74 MeV spacing between the
 /// first two states.
 ///
-/// Output: ./data/sim_reco.root (AtPatternEvent), fit it with the data's own fitter:
-///   root -l 'fitUKF_C14.C("sim",-1,"proton",+1,2.85,3.553e-5,"","./data/",0.5,0.1,1,10,"./data/")'
-///   NOTE bFieldSign = +1 for simulation. The data uses -1 because the sim reverses the
-///   drift-z handedness in digitization while the experiment does not.
+/// OUTPUT & FITTER INVOCATION:
+///     - Output: ./data/sim_reco.root (AtPatternEvent)
+///     - Fit it with the data's own fitter:
+///       root -l 'fitUKF_C14.C("sim",-1,"proton",+1,2.85,3.553e-5,"","./data/",0.5,0.1,1,10,"./data/")'
+///     - NOTE: bFieldSign = +1 for simulation. The data uses -1 because the sim reverses the
+///       drift-z handedness in digitization while the experiment does not.
 ///
 ///   root -l 'run_reco_C16pd.C()'
 

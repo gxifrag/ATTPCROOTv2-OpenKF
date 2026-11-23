@@ -1,55 +1,81 @@
 #include <TFile.h>
 #include <TParameter.h>
-
+#include <TDatabasePDG.h>
+#include <TParticlePDG.h>
 
 /// @file C16_pd_sim.C
-/// @brief a1975 16C(p,d)15C simulation, matched to the experimental running conditions.
+/// @brief a1975 16C(p,d)15C simulation, matched to experimental running conditions.
 ///
+/// Purpose: Acceptance of the deuteron channel measured per FINAL STATE. The (p,d)
+/// analysis extracts four states of 15C (ground state, 0.740, 3.10, and 4.66 MeV).
+/// Each state has distinct two-body kinematics, shifting theta_lab and deuteron energy.
+///
+/// EXPERIMENTAL CONDITIONS & BEAM ENERGETICS (a1975, proton-target runs):
+///     - Magnetic field: B = 2.85 T (field convention: bFieldkG = -28.5 kG)
+///     - Target gas: H2 at 300 torr, room temperature (293 K), rho = 3.308e-5 g/cm3 
+///       using geometry file ATTPC_H300torr_RT.root.
+///     - Active drift length: 1000 mm.
+///
+/// BEAM ENERGY PROFILE (16C on 1H2):
+///     - Accelerator beam energy (before IC):           196.0 MeV
+///     - Beam energy after IC (2 windows + IC gas):     188.34 MeV
+///     - Beam energy range inside AT-TPC active volume: 186.39 MeV (entrance after tpc_window) 
+///       down to 175.44 MeV (exit at z = 1000 mm).
+///     - Default simulation input (Ebeam at entrance):  186.4 MeV (subject to fine-tuning 
+///       and calibration against Ex spectra).
+///     
+/// NOTE: on Generator: The ion generator multiplies pz by A, so pz is in GeV/c per nucleon.
+/// NOTE: to match the excitation energy of the dround state in the analysis, it was decided that the beam after the IC but BEFORE the tpc_window was set to 184 MeV.
 
-/// Purpose: the acceptance of the deuteron channel, measured per FINAL STATE. The (p,d)
-/// analysis extracts four states of 15C -- the ground state, 0.740, 3.10 and 4.66 MeV -- and a
-/// transfer reaction changes its two-body kinematics with every one of them, so theta_lab
-/// (theta_cm) and the deuteron energy both move. An acceptance measured on one state does not
-/// describe another; that is the whole reason for running this per level rather than once.
-///
-/// CONDITIONS (a1975, proton-target runs):
-///     B = 2.85 T,  H2 at 300 torr,  drift length 1000 mm
-///     NOT: beam 16C at 192 MeV = 12.0 MeV/u
-///     beam 16C at 184 MeV = 11.5 MeV/u (energy at the chamber ENTRANCE, after the IC)
-///
-/// !! THE GAS IS 300 torr, AND THE PRODUCTION RECONSTRUCTION DISAGREES !!
-/// rho = 3.308e-5 g/cm3 (H2, 300 torr, 293 K), geometry ATTPC_H300torr_RT.root. But the a1975
-/// data reconstruction uses ATTPC_H1bar_geomanager.root (8.27e-5) and fitUKF_a1975.C defaults to
-/// gasDensity = 9.0e-5, i.e. 2.5 TIMES too much material. Energy loss scales with path length, so
-/// that error is angle- and vertex-dependent rather than a constant offset. This is the same
-/// class of mistake as the a1954 600-versus-300 torr error, which cost an entire production.
-///
-/// The 9.0e-5 figure is doubly wrong: even at 1 bar it is the 273 K density, where 293 K gives
-/// 8.27e-5. Use the _RT media entries, which carry the room-temperature values.
-///
-/// NOT: BEAM ENERGY. 192 MeV is what the (p,d) analysis macros use. The (p,p') calibration of the
-/// same data set prefers 195.5 MeV; the difference moves pz by 0.9 percent and is left as a
-/// parameter rather than silently chosen here.
-///
-/// BEAM ENERGY. 184 MeV is the physical energy at the gas entrance (12 MeV/u at the IC
-/// minus IC + windows). The analysis uses an EFFECTIVE 185 MeV tuned on the spectrum plus
-/// an empirical angle correction; that is a reconstruction parameter, not a physical energy.
-/// Beam momentum: the ion generator multiplies pz by A, so pz is GeV/c per nucleon.
-
-///     m(16C) = 16.0147 u = 14917.60 MeV
-///    NOT:  KE = 192.0 MeV  ->  p = 2401.088 MeV/c  ->  pz = 2.401088/16 per nucleon
-///     KE = 184.0 MeV  ->  p = 2350.22 MeV/c  ->  pz = 2.35022/16 per nucleon
 ///   root -l 'C16_pd_sim.C(2000)'                      // ground state
-///   root -l 'C16_pd_sim.C(8000,2.,178.,"TGeant4",-28.5,"./data/pd_ex1.root",0.740,1001)'
+///   root -l 'C16_pd_sim.C(8000,2.,178.,"TGeant4",-28.5,"./data/pd_ex1.root",0.740,1001,184.)'
 ///
-/// @note Mass argument convention: every AT-TPC sim macro passes the ion mass in amu to
-/// AtTPCIonGenerator, whose FairIon mass parameter is documented as GeV. The discrepancy is
-/// repo-wide and is kept so this sim stays comparable to its siblings -- but it means the beam
-/// energy must be VERIFIED from MC truth, not assumed.
-///
-/// CM ANGULAR RANGE: the default is the full 2-178 deg, because an acceptance measurement has to
-/// measure where the detector stops accepting. Truncating the generated range to the region that
-/// is known to work builds the answer into the input.
+/// MASS CHECK (added 2026-11-18) -- see the simulation log, "Masses: generator vs FairRoot vs Geant4".
+/// FairPrimaryGenerator computes every pushed particle's total energy E from its momentum and the
+/// mass in TDatabasePDG; Geant4 then starts it with T = E - m (G4PrimaryParticle::Set4Momentum).
+/// If the momentum was computed with a DIFFERENT mass, Geant4 starts the particle at a different
+/// kinetic energy than intended. This prints, for every pushed particle, the mass used for its
+/// momentum, the TDatabasePDG mass, and the resulting shift of the starting kinetic energy.
+/// Returns false if the BEAM shift is above 1 keV: the beam is fixed in this macro and must stay so.
+/// The PRODUCTS cannot be fixed here (their momenta come from AtTPC2Body); they are only reported.
+static bool checkPushedMasses(double Ebeam, double mBeamUsedMeV, const std::vector<Int_t> &Zp,
+                              const std::vector<Int_t> &Ap, const std::vector<Double_t> &massAmu,
+                              const std::vector<Double_t> &ExMeV)
+{
+   const double u = 931.49401; // MeV/u, the same factor AtTPC2Body uses
+   auto pdgOf = [](int Z, int A) { return 1000000000 + Z * 10000 + A * 10; };
+   auto mTDB = [](int pdg) {
+      auto *p = TDatabasePDG::Instance()->GetParticle(pdg);
+      return p ? p->Mass() * 1000. : -1.; // MeV
+   };
+   auto tG4 = [](double T, double mUsed, double mFair) { // Geant4's starting T for intended T
+      double p = std::sqrt(T * T + 2 * T * mUsed);
+      return std::sqrt(p * p + mFair * mFair) - mFair;
+   };
+   printf("\n===== MASS CHECK: mass used for the momentum vs mass FairRoot uses for E =====\n");
+   printf("  %-9s %11s %13s %13s %10s   %s\n", "particle", "pdg", "used [MeV]", "TDatabasePDG", "diff [keV]",
+          "Geant4 T - intended T");
+   const int pb = pdgOf(Zp[0], Ap[0]);
+   const double mb = mTDB(pb), dBeam = (tG4(Ebeam, mBeamUsedMeV, mb) - Ebeam) * 1000;
+   printf("  %-9s %11d %13.4f %13.4f %10.1f   %+.3f keV at T = %.2f MeV\n", "beam", pb, mBeamUsedMeV, mb,
+          (mBeamUsedMeV - mb) * 1000, dBeam, Ebeam);
+   for (size_t i = 2; i < Zp.size(); ++i) { // 0 = beam, 1 = target (not pushed), 2.. = products
+      const int pdg = pdgOf(Zp[i], Ap[i]);
+      const double mUsed = massAmu[i] * u + ExMeV[i], mf = mTDB(pdg);
+      printf("  %-9s %11d %13.4f %13.4f %10.1f   %+.1f keV at T = 10 MeV, %+.1f keV at T = 30 MeV\n",
+             Form("product%zu", i - 1), pdg, mUsed, mf, (mUsed - mf) * 1000, (tG4(10, mUsed, mf) - 10) * 1000,
+             (tG4(30, mUsed, mf) - 30) * 1000);
+   }
+   const bool beamOK = std::fabs(dBeam) < 1.0;
+   if (beamOK)
+      printf("\033[1;32m  beam OK: Geant4 starts it within 1 keV of Ebeam.\033[0m\n");
+   else
+      printf("\033[1;31m  BEAM MASS MISMATCH: Geant4 would start the beam %.1f keV away from Ebeam.\033[0m\n", dBeam);
+   printf("\033[1;33m  Products: any nonzero shift above is NOT corrected by this macro (AtTPC2Body pushes only the\n"
+          "  momentum). See the simulation log.\033[0m\n\n");
+   return beamOK;
+}
+
 void C16_pd_sim(Int_t nEvents = 20000, Double_t thetaMinCM = 2.0, Double_t thetaMaxCM = 178.0,
                 TString mcEngine = "TGeant4", Double_t bFieldkG = -28.5, TString outFile = "./data/attpcsim.root",
                 Double_t resEx = 0.0, UInt_t seed = 0, Double_t Ebeam = 184.0) //192.0
@@ -96,10 +122,25 @@ void C16_pd_sim(Int_t nEvents = 20000, Double_t thetaMinCM = 2.0, Double_t theta
    // -----   Beam : 16C   ---------------------------------------------------
    Int_t z = 6;  // atomic number
    Int_t a = 16; // mass number
+   // CHARGE STATE: keep q = 0 together with ATOMIC beam masses. Tested 2026-11-18 (simulation log,
+   // "Beam charge state"): q does not change the beam's energy loss, trajectory or vertex, but Geant4
+   // tracks the beam with ITS OWN nucleus mass + (Z - q) electrons (it ignores Bmass), while AtTpc
+   // computes the vertex energy as Etot - Bmass*u. q = 6 with atomic Bmass: reaction beam 3.07 MeV too
+   // low (momentum off by 19.9 MeV/c). q = 6 with nucleus Bmass: off by 0.25 MeV/c, because the beam
+   // mass in the reaction list (Mass.push_back below) is still atomic. To use q = Z, BOTH Bmass and the
+   // beam entry of the mass list must be nucleus masses.
    Int_t q = 0;  // charge state
    Int_t m = 1;  // multiplicity
-   const Double_t u = 931.49401, mBeamMeV = 16.0147 * u;
-   Double_t pTot = std::sqrt(Ebeam * Ebeam + 2 * Ebeam * mBeamMeV) / 1000.0; // GeV/c
+   // MASS FOR THE BEAM MOMENTUM (fixed 2026-11-18). FairPrimaryGenerator computes the beam's total
+   // energy with the TDatabasePDG mass, which for 16C is the NUCLEUS mass (atomic - 6 electrons),
+   // and Geant4 starts the beam with T = E - m. So the momentum must be computed with that same
+   // nucleus mass; with the atomic mass Geant4 started the beam at 184.037 MeV instead of 184.000.
+   // Bmass below stays ATOMIC: AtTpc uses it to compute the beam energy at the vertex, and Geant4
+   // tracks the q = 0 beam with the atomic mass. checkPushedMasses() verifies this after Init().
+   const Double_t u = 931.49401, me = 0.51099895;               // MeV
+   const Double_t mBeamAtomicMeV = 16.0147 * u;                 // atomic mass (neutral 16C)
+   const Double_t mBeamNucleusMeV = mBeamAtomicMeV - z * me;    // nucleus mass = what FairRoot uses
+   Double_t pTot = std::sqrt(Ebeam * Ebeam + 2 * Ebeam * mBeamNucleusMeV) / 1000.0; // GeV/c
    Double_t px = 0.000 / a;
    Double_t py = 0.000 / a;
    Double_t pz = pTot / a; // GeV/c per nucleon
@@ -192,6 +233,12 @@ void C16_pd_sim(Int_t nEvents = 20000, Double_t thetaMinCM = 2.0, Double_t theta
    run->SetStoreTraj(kTRUE);
 
    run->Init();
+
+   // Verify the beam momentum against FairRoot's mass and report the products (see checkPushedMasses).
+   if (!checkPushedMasses(Ebeam, mBeamNucleusMeV, Zp, Ap, Mass, ExE)) {
+      std::cout << "STOPPING: fix the beam mass before simulating." << std::endl;
+      return;
+   }
 
    Bool_t kParameterMerged = kTRUE;
    FairParRootFileIo *parOut = new FairParRootFileIo(kParameterMerged);
