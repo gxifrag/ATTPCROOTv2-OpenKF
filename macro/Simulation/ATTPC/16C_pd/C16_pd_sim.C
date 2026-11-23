@@ -54,7 +54,7 @@ static bool checkPushedMasses(double Ebeam, double mBeamUsedMeV, const std::vect
    };
    printf("\n===== MASS CHECK: mass used for the momentum vs mass FairRoot uses for E =====\n");
    printf("  %-9s %11s %13s %13s %10s   %s\n", "particle", "pdg", "used [MeV]", "TDatabasePDG", "diff [keV]",
-          "Geant4 T - intended T");
+          "T shift if E from TDatabasePDG");
    const int pb = pdgOf(Zp[0], Ap[0]);
    const double mb = mTDB(pb), dBeam = (tG4(Ebeam, mBeamUsedMeV, mb) - Ebeam) * 1000;
    printf("  %-9s %11d %13.4f %13.4f %10.1f   %+.3f keV at T = %.2f MeV\n", "beam", pb, mBeamUsedMeV, mb,
@@ -71,8 +71,9 @@ static bool checkPushedMasses(double Ebeam, double mBeamUsedMeV, const std::vect
       printf("\033[1;32m  beam OK: Geant4 starts it within 1 keV of Ebeam.\033[0m\n");
    else
       printf("\033[1;31m  BEAM MASS MISMATCH: Geant4 would start the beam %.1f keV away from Ebeam.\033[0m\n", dBeam);
-   printf("\033[1;33m  Products: any nonzero shift above is NOT corrected by this macro (AtTPC2Body pushes only the\n"
-          "  momentum). See the simulation log.\033[0m\n\n");
+   printf("\033[1;33m  Products: the shifts above are what Geant4 WOULD apply if E came from TDatabasePDG. Since\n"
+          "  2026-11-18 AtTPC2Body passes the total energy from its own mass (incl. Ex) for ion products, so\n"
+          "  Geant4 starts and tracks them with that mass and the intended T. See the simulation log, \"Masses\".\033[0m\n\n");
    return beamOK;
 }
 
