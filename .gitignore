@@ -62,3 +62,6 @@ build_genfit
 
 .claude/plans/*
 
+
+# clangd index
+.cache/
